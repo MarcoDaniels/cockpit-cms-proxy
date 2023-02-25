@@ -7,18 +7,13 @@ let
 
   start = pkgs.writeShellScriptBin "start" ''
     rm -rf dist/
-    ${pkgs.nodePackages.typescript}/bin/tsc
-    ${pkgs.nodejs}/bin/node dist/index.js
+    ${pkgs.nodePackages.typescript}/bin/tsc -p tsconfig.json
+    ${pkgs.nodejs}/bin/node build/index.js
   '';
 
 in pkgs.mkShell {
   buildInputs = [
     pkgs.nixfmt
     start
-
-    pkgs.nodePackages.typescript
-    pkgs.nodejs
-    pkgs.yarn
-    pkgs.yarn2nix
   ];
 }
