@@ -1,27 +1,31 @@
-#!/usr/bin/env node
-import {asString, environmentDecoder} from 'environment-decoder'
+import {asNumber, asString, environmentDecoder} from 'environment-decoder'
 import http from 'http'
 import https from 'https'
-import {URL} from 'url'
 import {match, P} from 'ts-pattern'
+import {parse} from 'url'
 
 const env = environmentDecoder({
     COCKPIT_API_TOKEN: asString,
     COCKPIT_BASE_URL: asString,
-    COCKPIT_MODE: asString,
+    TARGET_HOST: asString,
+    TARGET_PORT: asNumber,
+    PORT: asNumber
 })
 
-http.createServer((incomingMessage, serverResponse) => {
-    const parseURL = new URL(incomingMessage.url || '')
 
-    match(parseURL)
-        .with({pathname: P.when((p) => p.startsWith('/image/api/'))}, ({pathname, search}) => {
-            const path = pathname.replace('/image/api', "")
+http.createServer((incomingMessage, serverResponse) =>
+    match(incomingMessage)
+        .with({url: P.when((p) => p.startsWith('/image/api/'))}, ({url}) => {
+            const {pathname, search} = parse(url, true)
+            const path = pathname?.replace('/image/api', "")
 
             const host = (env.COCKPIT_BASE_URL).replace("https://", "")
             const options: http.RequestOptions = {
                 host: host,
-                path: "/api/cockpit/image?token=" + env.COCKPIT_API_TOKEN + "&src=" + env.COCKPIT_BASE_URL + "/storage/uploads" + path + "&" + search.substring(0),
+                path: "/api/cockpit/image?token="
+                    + env.COCKPIT_API_TOKEN
+                    + "&src=" + env.COCKPIT_BASE_URL + "/storage/uploads"
+                    + path + "&" + search?.substring(1),
                 method: incomingMessage.method,
                 headers: {...incomingMessage.headers, host: host},
             }
@@ -33,30 +37,20 @@ http.createServer((incomingMessage, serverResponse) => {
         })
         .otherwise(() => {
             const options = {
-                host: parseURL.hostname,
-                port: 1234,
-                path: parseURL.pathname,
+                port: env.TARGET_PORT,
+                hostname: env.TARGET_HOST,
+                path: incomingMessage.url,
                 method: incomingMessage.method,
                 headers: incomingMessage.headers,
             }
 
-            const backend_req = http.request(options, (backIncomingMessage) => {
-                serverResponse.writeHead(Number(backIncomingMessage.statusCode), backIncomingMessage.headers)
-                backIncomingMessage.on('data', (chunk) => {
-                    serverResponse.write(chunk)
-                })
-                backIncomingMessage.on('end', () => {
-                    serverResponse.end()
-                })
+            const backendRequest = http.request(options, (backendIncomingMessage) => {
+                serverResponse.writeHead(Number(backendIncomingMessage.statusCode), backendIncomingMessage.headers)
+                backendIncomingMessage.pipe(serverResponse, {end: true})
             })
 
-            incomingMessage.on('data', (chunk) => {
-                backend_req.write(chunk)
-            })
-            incomingMessage.on('end', () => {
-                backend_req.end()
-            })
+            incomingMessage.pipe(backendRequest, {end: true})
         })
-}).listen(8000)
+).listen(env.PORT)
 
-console.log(`running dev in http://localhost:8000`)
+console.log(`CockpitCMS proxy at http://localhost:${env.PORT}`)
