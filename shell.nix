@@ -12,5 +12,5 @@ let
 
 in pkgs.mkShell {
   RUST_BACKTRACE = 1;
-  buildInputs = [ rust-toolchain pkgs.rustfmt ];
+  buildInputs = [ rust-toolchain pkgs.rustfmt pkgs.darwin.apple_sdk.frameworks.Security ];
 }
