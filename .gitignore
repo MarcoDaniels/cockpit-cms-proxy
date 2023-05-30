@@ -1,6 +1,5 @@
 .env
 .idea
 
-# Added by cargo
-
-/target
+dist
+elm-stuff

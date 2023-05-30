@@ -5,12 +5,21 @@ let
     sha256 = "0fvz2phhvnh6pwz6bycmlm6wkn5aydpr2bsinw8hmv5hvvcx4hr1";
   }) { };
 
-  rust-toolchain = pkgs.symlinkJoin {
-    name = "rust-toolchain";
-    paths = [ pkgs.rustc pkgs.cargo pkgs.rustPlatform.rustcSrc ];
-  };
+  startDev = pkgs.writeShellScriptBin "startDev" ''
+    rm -rf dist
+    ${pkgs.elmPackages.elm}/bin/elm make --optimize src/Main.elm --output=dist/elm.js
+    cp src/index.js dist/index.js
+    ${pkgs.nodejs-18_x}/bin/node ./dist/index.js $1
+  '';
 
 in pkgs.mkShell {
-  RUST_BACKTRACE = 1;
-  buildInputs = [ rust-toolchain pkgs.rustfmt pkgs.darwin.apple_sdk.frameworks.Security ];
+  buildInputs = [
+    pkgs.nodejs-18_x
+    pkgs.elmPackages.elm
+    pkgs.elmPackages.elm-format
+    pkgs.elmPackages.elm-test
+    pkgs.elm2nix
+
+    startDev
+  ];
 }
