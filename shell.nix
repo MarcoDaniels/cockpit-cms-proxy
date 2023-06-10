@@ -7,7 +7,7 @@ let
 
   startDev = pkgs.writeShellScriptBin "startDev" ''
     rm -rf dist
-    ${pkgs.elmPackages.elm}/bin/elm make --optimize src/Main.elm --output=dist/elm.js
+    ${pkgs.elmPackages.elm}/bin/elm make src/Main.elm --output=dist/elm.js
     cp src/index.js dist/index.js
     ${pkgs.nodejs-18_x}/bin/node ./dist/index.js $1
   '';
