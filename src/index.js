@@ -8,13 +8,13 @@ const app = Elm.Main.init({
     }
 })
 
-app.ports.output.subscribe(({success, options, secure, data, handler: {request, response}}) => {
+app.ports.output.subscribe(({request, response, meta: {success, options, secure, data}}) => {
     if (success) {
         request.pipe((secure ? https : http).request(options, (incoming) => {
             response.writeHead(Number(incoming.statusCode), incoming.headers);
             incoming.pipe(response, {end: true})
         }).on('error', (err) => {
-            app.ports.input.send({success: false, error: err.message, handler: {request, response}});
+            app.ports.input.send({request, response, meta: {success: false, error: err.message}});
         }), {end: true})
     } else {
         response.statusCode = 500;
@@ -24,7 +24,7 @@ app.ports.output.subscribe(({success, options, secure, data, handler: {request, 
 
 http
     .createServer((request, response) => {
-        app.ports.input.send({success: true, handler: {request, response}});
+        app.ports.input.send({request, response, meta: {success: true}});
     })
     .listen(process.env.PORT);
 
