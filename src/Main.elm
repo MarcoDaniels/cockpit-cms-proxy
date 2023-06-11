@@ -36,7 +36,7 @@ type OutputPort
 
 
 type alias OutputOk =
-    { success : Bool, options : Maybe Encode.Value, secure : Bool, handler : HTTPReqRes }
+    { success : Bool, options : Options, secure : Bool, handler : HTTPReqRes }
 
 
 type alias OutputError =
@@ -64,18 +64,26 @@ type alias Config =
     { baseURL : String, token : String }
 
 
-toOutput : OutputPort -> Encode.Value
+toOutput : OutputPort -> Cmd msg
 toOutput out =
     let
         handlerEncoder : HTTPReqRes -> Encode.Value
         handlerEncoder handler =
             Encode.object [ ( "request", handler.request ), ( "response", handler.response ) ]
     in
-    case out of
+    (case out of
         OutputPortOk ok ->
             Encode.object
                 [ ( "success", Encode.bool ok.success )
-                , ( "options", ok.options |> Maybe.withDefault Encode.null )
+                , ( "options"
+                  , Encode.object
+                        [ ( "headers", ok.options.headers |> Encode.dict identity Encode.string )
+                        , ( "hostname", Encode.string ok.options.hostname )
+                        , ( "port", ok.options.port_ |> Maybe.map Encode.int |> Maybe.withDefault Encode.null )
+                        , ( "path", Encode.string ok.options.path )
+                        , ( "method", Encode.string ok.options.method )
+                        ]
+                  )
                 , ( "secure", Encode.bool ok.secure )
                 , ( "handler", handlerEncoder ok.handler )
                 ]
@@ -86,10 +94,12 @@ toOutput out =
                 , ( "data", Encode.string err.data )
                 , ( "handler", handlerEncoder err.handler )
                 ]
+    )
+        |> output
 
 
-decoder : Decoder InputPort
-decoder =
+fromInput : Decoder InputPort
+fromInput =
     Decode.field "success" Decode.bool
         |> Decode.andThen
             (\success ->
@@ -122,19 +132,8 @@ main =
     Platform.worker
         { init = \config -> ( config, Cmd.none )
         , update = update
-        , subscriptions = \_ -> input (Decode.decodeValue decoder)
+        , subscriptions = \_ -> input (Decode.decodeValue fromInput)
         }
-
-
-options : Options -> Encode.Value
-options opts =
-    Encode.object
-        [ ( "headers", opts.headers |> Encode.dict identity Encode.string )
-        , ( "hostname", Encode.string opts.hostname )
-        , ( "port", opts.port_ |> Maybe.map Encode.int |> Maybe.withDefault Encode.null )
-        , ( "path", Encode.string opts.path )
-        , ( "method", Encode.string opts.method )
-        ]
 
 
 update : Result Error InputPort -> Config -> ( Config, Cmd (Result Error InputPort) )
@@ -142,28 +141,21 @@ update msg config =
     case msg of
         Err _ ->
             ( config
-            , output
-                (OutputPortError
-                    { success = False
-                    , data = "Error on decoder"
-                    , handler = { response = Encode.null, request = Encode.null }
-                    }
-                    |> toOutput
-                )
+            , OutputPortError
+                { success = False
+                , data = "Error on decoder"
+                , handler = { response = Encode.null, request = Encode.null }
+                }
+                |> toOutput
             )
 
-        Ok a ->
-            case a of
+        Ok inputDecoded ->
+            case inputDecoded of
                 InputPortError { error, handler } ->
                     ( config
-                    , output
-                        (OutputPortError
-                            { success = False
-                            , data = "something went wrong"
-                            , handler = handler
-                            }
-                            |> toOutput
-                        )
+                    , OutputPortError
+                        { success = False, data = "Handler error: " ++ error, handler = handler }
+                        |> toOutput
                     )
 
                 InputPortOk { handler } ->
@@ -180,24 +172,19 @@ update msg config =
                             case checkRoute url of
                                 Page ->
                                     ( config
-                                    , output
-                                        (OutputPortOk
-                                            { success = True
-                                            , handler = handler
-                                            , options =
-                                                Just
-                                                    (options
-                                                        { headers = Dict.union (Dict.insert "host" "localhost" Dict.empty) headers
-                                                        , hostname = "localhost"
-                                                        , port_ = Just 1234
-                                                        , path = url
-                                                        , method = method
-                                                        }
-                                                    )
-                                            , secure = False
+                                    , OutputPortOk
+                                        { success = True
+                                        , handler = handler
+                                        , options =
+                                            { headers = Dict.union (Dict.insert "host" "localhost" Dict.empty) headers
+                                            , hostname = "localhost"
+                                            , port_ = Just 1234
+                                            , path = url
+                                            , method = method
                                             }
-                                            |> toOutput
-                                        )
+                                        , secure = False
+                                        }
+                                        |> toOutput
                                     )
 
                                 ImageAPI ->
@@ -218,43 +205,37 @@ update msg config =
                                             String.replace "https://" "" config.baseURL
                                     in
                                     ( config
-                                    , output
-                                        (OutputPortOk
-                                            { success = True
-                                            , handler = handler
-                                            , options =
-                                                Just
-                                                    (options
-                                                        { headers = Dict.union (Dict.insert "host" host Dict.empty) headers
-                                                        , hostname = host
-                                                        , port_ = Nothing
-                                                        , path =
-                                                            [ "/api/cockpit/image?token="
-                                                            , config.token
-                                                            , "&src="
-                                                            , config.baseURL
-                                                            , "/storage/uploads"
-                                                            , String.replace "/image/api" "" urls.path
-                                                            , "&"
-                                                            , urls.query |> Maybe.withDefault ""
-                                                            ]
-                                                                |> String.concat
-                                                        , method = method
-                                                        }
-                                                    )
-                                            , secure = True
+                                    , OutputPortOk
+                                        { success = True
+                                        , handler = handler
+                                        , options =
+                                            { headers = Dict.union (Dict.insert "host" host Dict.empty) headers
+                                            , hostname = host
+                                            , port_ = Nothing
+                                            , path =
+                                                [ "/api/cockpit/image?token="
+                                                , config.token
+                                                , "&src="
+                                                , config.baseURL
+                                                , "/storage/uploads"
+                                                , String.replace "/image/api" "" urls.path
+                                                , "&"
+                                                , urls.query |> Maybe.withDefault ""
+                                                ]
+                                                    |> String.concat
+                                            , method = method
                                             }
-                                            |> toOutput
-                                        )
+                                        , secure = True
+                                        }
+                                        |> toOutput
                                     )
 
                         -- TODO: handle errors
                         Err _ ->
                             ( config
-                            , output
-                                (OutputPortOk { success = True, handler = handler, options = Nothing, secure = False }
-                                    |> toOutput
-                                )
+                            , OutputPortError
+                                { success = False, data = "something went wrong", handler = handler }
+                                |> toOutput
                             )
 
 

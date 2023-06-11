@@ -14,7 +14,7 @@ app.ports.output.subscribe(({success, options, secure, data, handler: {request, 
             response.writeHead(Number(incoming.statusCode), incoming.headers);
             incoming.pipe(response, {end: true})
         }).on('error', (err) => {
-            app.ports.input.send({success: false, error: err.name, handler: {request, response}});
+            app.ports.input.send({success: false, error: err.message, handler: {request, response}});
         }), {end: true})
     } else {
         response.statusCode = 500;
