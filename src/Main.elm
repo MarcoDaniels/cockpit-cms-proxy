@@ -69,7 +69,12 @@ type alias Options =
 
 
 type alias Config =
-    { baseURL : String, token : String }
+    { baseURL : String
+    , token : String
+    , assetsPath : String
+    , targetHost : String
+    , targetPort : Maybe Int
+    }
 
 
 toOutput : OutputPort -> Cmd msg
@@ -161,7 +166,7 @@ update msg config =
                                     request
                             of
                                 Ok { url, method, headers } ->
-                                    case checkRoute url of
+                                    case checkRoute config.assetsPath url of
                                         Page ->
                                             ( config
                                             , { request = request
@@ -170,9 +175,9 @@ update msg config =
                                                     MetaOutputOk
                                                         { success = True
                                                         , options =
-                                                            { headers = Dict.union (Dict.insert "host" "localhost" Dict.empty) headers
-                                                            , hostname = "localhost"
-                                                            , port_ = Just 1234
+                                                            { headers = Dict.union (Dict.insert "host" config.targetHost Dict.empty) headers
+                                                            , hostname = config.targetHost
+                                                            , port_ = config.targetPort
                                                             , path = url
                                                             , method = method
                                                             }
@@ -215,7 +220,7 @@ update msg config =
                                                                 , "&src="
                                                                 , config.baseURL
                                                                 , "/storage/uploads"
-                                                                , String.replace "/image/api" "" urls.path
+                                                                , String.replace config.assetsPath "" urls.path
                                                                 , "&"
                                                                 , urls.query |> Maybe.withDefault ""
                                                                 ]
@@ -243,9 +248,9 @@ type Route
     | Page
 
 
-checkRoute : String -> Route
-checkRoute url =
-    if String.startsWith "/image/api/" url then
+checkRoute : String -> String -> Route
+checkRoute pattern url =
+    if String.startsWith pattern url then
         ImageAPI
 
     else

@@ -5,12 +5,15 @@ const app = Elm.Main.init({
     flags: {
         baseURL: process.env.COCKPIT_BASE_URL,
         token: process.env.COCKPIT_API_TOKEN,
+        assetsPath: process.env.ASSET_PATH_PATTERN,
+        targetHost: process.env.TARGET_HOST,
+        targetPort: Number(process.env.TARGET_PORT),
     }
 })
 
-app.ports.output.subscribe(({request, response, meta: {success, options, secure, data}}) => {
-    if (success) {
-        request.pipe((secure ? https : http).request(options, (incoming) => {
+app.ports.output.subscribe(({request, response, meta}) => {
+    if (meta && meta.success) {
+        request.pipe((meta.secure ? https : http).request(meta.options, (incoming) => {
             response.writeHead(Number(incoming.statusCode), incoming.headers);
             incoming.pipe(response, {end: true})
         }).on('error', (err) => {
@@ -18,7 +21,7 @@ app.ports.output.subscribe(({request, response, meta: {success, options, secure,
         }), {end: true})
     } else {
         response.statusCode = 500;
-        response.end(data);
+        response.end(meta.data);
     }
 });
 
