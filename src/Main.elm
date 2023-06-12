@@ -1,6 +1,8 @@
 port module Main exposing (main)
 
 import Dict
+import Html.String as Html
+import Html.String.Attributes as Html
 import Json.Decode as Decode exposing (Decoder, Error)
 import Json.Decode.Pipeline as Decode
 import Json.Encode as Encode
@@ -137,6 +139,28 @@ main =
         }
 
 
+errorMessage : String -> String
+errorMessage msg =
+    Html.div
+        [ Html.style "display" "flex"
+        , Html.style "justify-content" "center"
+        , Html.style "flex-direction" "column"
+        , Html.style "align-items" "center"
+        ]
+        [ Html.div [] [ Html.h1 [] [ Html.text "Cockpit CMS proxy" ] ]
+        , Html.div [] [ Html.text "There seems to be an error in the proxy configuration" ]
+        , Html.div [ Html.style "margin-top" "20px" ]
+            [ Html.code
+                [ Html.style "background-color" "#f1f1f1"
+                , Html.style "color" "crimson"
+                , Html.style "padding" "10px"
+                ]
+                [ Html.text msg ]
+            ]
+        ]
+        |> Html.toString 2
+
+
 update : Msg -> Config -> ( Config, Cmd Msg )
 update msg config =
     case msg of
@@ -147,7 +171,7 @@ update msg config =
                     ( config
                     , { response = response
                       , request = request
-                      , meta = MetaOutputError { success = False, data = err }
+                      , meta = MetaOutputError { success = False, data = errorMessage err }
                       }
                         |> toOutput
                     )
