@@ -16,9 +16,6 @@ in pkgs.mkShell {
   buildInputs = [
     pkgs.nodejs-18_x
     pkgs.elmPackages.elm
-    pkgs.elmPackages.elm-format
-    pkgs.elmPackages.elm-test
-    pkgs.elm2nix
 
     startDev
   ];
