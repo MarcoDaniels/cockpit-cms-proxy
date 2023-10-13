@@ -1,22 +1,33 @@
 let
   pkgs = import (fetchTarball {
-    name = "nixpkgs-22.11-darwin-2023-01-09";
-    url = "https://github.com/NixOS/nixpkgs/archive/6713011f9e92.tar.gz";
-    sha256 = "0fvz2phhvnh6pwz6bycmlm6wkn5aydpr2bsinw8hmv5hvvcx4hr1";
+    name = "nixpkgs-23.05-darwin-2023-10-05";
+    url = "https://github.com/NixOS/nixpkgs/archive/1e9c7c0203be.tar.gz";
+    sha256 = "10qbybc9k3dj1xap9n0i3z7pc3svzwhclgsyfzzsf8cfh8l518pn";
   }) { };
 
-  startDev = pkgs.writeShellScriptBin "startDev" ''
-    rm -rf dist
-    ${pkgs.elmPackages.elm}/bin/elm make src/Main.elm --output=dist/elm.js
-    cp src/index.js dist/index.js
-    ${pkgs.nodejs-18_x}/bin/node ./dist/index.js $1
-  '';
+  inherit (pkgs.lib) optional optionals;
 
-in pkgs.mkShell {
-  buildInputs = [
-    pkgs.nodejs-18_x
-    pkgs.elmPackages.elm
+  erlang = pkgs.beam.interpreters.erlangR26;
 
-    startDev
+  gleam = pkgs.stdenv.mkDerivation rec {
+    name = "gleam-${version}";
+    version = "v0.31.0";
+    src = pkgs.fetchurl {
+      url = "https://github.com/gleam-lang/gleam/releases/download/${version}/gleam-${version}-x86_64-apple-darwin.tar.gz";
+      sha256 = "sha256-Ty7RKPJ9BZ/vE1ILM0J2N6Qv0sqFDJzlyAlYWJTXRbA=";
+    };
+    phases = [ "installPhase" ];
+    installPhase = ''
+      mkdir -p $out/bin
+      tar -xf $src -C $out/bin
+    '';
+  };
+
+in pkgs.mkShell rec {
+  buildInputs = with pkgs;
+  [
+    gleam
+    erlang
+    rebar3
   ];
 }
