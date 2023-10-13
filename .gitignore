@@ -3,3 +3,8 @@
 
 dist
 elm-stuff
+
+*.beam
+*.ez
+build
+erl_crash.dump
