@@ -17,7 +17,6 @@ Set the environment variables for your Cockpit CMS:
 ```shell
 export COCKPIT_BASE_URL=https://example.com
 export COCKPIT_API_TOKEN=1234
-export ASSET_PATH_PATTERN=/images/pattern
 export TARGET_HOST=localhost
 export TARGET_PORT=8080
 export PORT=8000
@@ -26,5 +25,5 @@ export PORT=8000
 Run the proxy with the command:
 
 ```shell
-startDev
+gleam run
 ```
