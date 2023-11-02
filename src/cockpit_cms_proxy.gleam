@@ -13,23 +13,17 @@ import gleam/result
 import gleam/int
 
 pub type Website {
-  Website(
-    target_host: String,
-    target_port: Int,
-    scheme: Scheme,
-    method: Method,
-    path: String,
-  )
+  Website(config: Configuration, scheme: Scheme, method: Method, path: String)
 }
 
-fn handle_website(config: Website) -> Response(ResponseData) {
+fn handle_website(handler: Website) -> Response(ResponseData) {
   let result =
     request.new()
-    |> request.set_scheme(config.scheme)
-    |> request.set_method(config.method)
-    |> request.set_host(config.target_host)
-    |> request.set_port(config.target_port)
-    |> request.set_path(config.path)
+    |> request.set_scheme(handler.scheme)
+    |> request.set_method(handler.method)
+    |> request.set_host(handler.config.target_host)
+    |> request.set_port(handler.config.target_port)
+    |> request.set_path(handler.path)
     |> httpc.send
 
   case result {
@@ -38,29 +32,26 @@ fn handle_website(config: Website) -> Response(ResponseData) {
       |> response.set_body(mist.Bytes(bit_builder.from_string(r.body)))
     Error(_) ->
       response.new(404)
-      |> response.set_body(mist.Bytes(bit_builder.from_string("<h1>nope</h1>")))
+      |> response.set_body(mist.Bytes(bit_builder.from_string(
+        "<h1>Not Found</h1><p>Website route " <> handler.path <> "`` not found</p>",
+      )))
   }
 }
 
 type Image {
-  Image(
-    base_url: String,
-    api_token: String,
-    path: List(String),
-    query: Option(String),
-  )
+  Image(config: Configuration, path: List(String), query: Option(String))
 }
 
-fn handle_images(config: Image) -> Response(ResponseData) {
+fn handle_images(handler: Image) -> Response(ResponseData) {
   let url =
-    "/api/cockpit/image?token=" <> config.api_token <> "&src=" <> config.base_url <> "/storage/uploads/" <> string.join(
-      config.path,
+    "/api/cockpit/image?token=" <> handler.config.api_token <> "&src=" <> handler.config.base_url <> "/storage/uploads/" <> string.join(
+      handler.path,
       "/",
-    ) <> "&" <> unwrap(config.query, "")
+    ) <> "&" <> unwrap(handler.query, "")
 
   let result =
     request.new()
-    |> request.set_host(string.replace(config.base_url, "https://", ""))
+    |> request.set_host(string.replace(handler.config.base_url, "https://", ""))
     |> request.set_path(url)
     |> request.set_body(<<>>)
     |> httpc.send_bits
@@ -71,11 +62,13 @@ fn handle_images(config: Image) -> Response(ResponseData) {
       |> response.set_body(mist.Bytes(bit_builder.from_bit_string(r.body)))
     Error(_) ->
       response.new(404)
-      |> response.set_body(mist.Bytes(bit_builder.from_string("<h1>nope</h1>")))
+      |> response.set_body(mist.Bytes(bit_builder.from_string(
+        "<h1>Not Found</h1><p>Image " <> handler.path <> "`` not found</p>",
+      )))
   }
 }
 
-type Configuration {
+pub type Configuration {
   Configuration(
     base_url: String,
     api_token: String,
@@ -111,20 +104,8 @@ pub fn main() {
       fn(req: Request(Connection)) -> Response(ResponseData) {
         case request.path_segments(req) {
           ["image", "api", ..path] ->
-            handle_images(Image(
-              config.base_url,
-              config.api_token,
-              path,
-              req.query,
-            ))
-          _ ->
-            handle_website(Website(
-              config.target_host,
-              config.target_port,
-              req.scheme,
-              req.method,
-              req.path,
-            ))
+            handle_images(Image(config, path, req.query))
+          _ -> handle_website(Website(config, req.scheme, req.method, req.path))
         }
       }
       |> mist.new
