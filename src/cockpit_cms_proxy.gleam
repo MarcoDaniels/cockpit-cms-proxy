@@ -8,6 +8,7 @@ import gleam/httpc
 import gleam/http.{Method, Scheme}
 import gleam/string
 import gleam/io
+import gleam/list
 import gleam/option.{Option, unwrap}
 import gleam/result
 import gleam/int
@@ -78,15 +79,11 @@ pub type Configuration {
 }
 
 fn load_configuration() -> Result(Configuration, String) {
-  case
-    result.all([
-      os.get_env("COCKPIT_BASE_URL"),
-      os.get_env("COCKPIT_API_TOKEN"),
-      os.get_env("TARGET_HOST"),
-      os.get_env("TARGET_PORT"),
-      os.get_env("PORT"),
-    ])
-  {
+  let envs = [
+    "COCKPIT_BASE_URL", "COCKPIT_API_TOKEN", "TARGET_HOST", "TARGET_PORT",
+    "PORT",
+  ]
+  case result.all(list.map(envs, os.get_env)) {
     Ok([base_url, api_token, target_host, target_p, p]) ->
       case result.all([int.parse(target_p), int.parse(p)]) {
         Ok([target_port, port]) ->
