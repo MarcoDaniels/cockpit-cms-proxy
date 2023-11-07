@@ -33,7 +33,7 @@ fn handle_website(handler: Website) -> Response(ResponseData) {
     Error(_) ->
       response.new(404)
       |> response.set_body(mist.Bytes(bit_builder.from_string(
-        "<h1>Not Found</h1><p>Website route " <> handler.path <> "`` not found</p>",
+        "<h1>Not Found</h1><p>Website route " <> handler.path <> " not found</p>",
       )))
   }
 }
@@ -43,11 +43,10 @@ type Image {
 }
 
 fn handle_images(handler: Image) -> Response(ResponseData) {
+  let path = string.join(handler.path, "/")
+  let query = unwrap(handler.query, "")
   let url =
-    "/api/cockpit/image?token=" <> handler.config.api_token <> "&src=" <> handler.config.base_url <> "/storage/uploads/" <> string.join(
-      handler.path,
-      "/",
-    ) <> "&" <> unwrap(handler.query, "")
+    "/api/cockpit/image?token=" <> handler.config.api_token <> "&src=" <> handler.config.base_url <> "/storage/uploads/" <> path <> "&" <> query
 
   let result =
     request.new()
@@ -63,7 +62,7 @@ fn handle_images(handler: Image) -> Response(ResponseData) {
     Error(_) ->
       response.new(404)
       |> response.set_body(mist.Bytes(bit_builder.from_string(
-        "<h1>Not Found</h1><p>Image " <> handler.path <> "`` not found</p>",
+        "<h1>Not Found</h1><p>Image " <> path <> " not found</p>",
       )))
   }
 }
